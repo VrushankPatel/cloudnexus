@@ -55,7 +55,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <Archive className="w-5 h-5 text-primary-foreground" />
               </div>
-              <h1 className="text-xl font-semibold text-sidebar-foreground">Cloud Hub</h1>
+              <h1 className="text-xl font-semibold text-sidebar-foreground">CloudNexus</h1>
             </div>
             
             {/* Mobile close button */}

@@ -166,7 +166,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
-            Customize your Personal Cloud Hub experience
+            Customize your CloudNexus experience
           </DialogDescription>
         </DialogHeader>
         
@@ -327,7 +327,7 @@ export default function SettingsModal({ open, onOpenChange }: SettingsModalProps
               About
             </h3>
             <div className="text-sm text-slate-400 space-y-1">
-              <p>Personal Cloud Hub v1.0.0</p>
+              <p>CloudNexus v1.0.0</p>
               <p>A minimalist file storage and note-taking platform</p>
               <p className="text-xs">Built with React, TypeScript, and Express</p>
             </div>

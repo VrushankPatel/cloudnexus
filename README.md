@@ -1,6 +1,6 @@
-# Personal Cloud Hub
+# CloudNexus
 
-A comprehensive personal cloud hub with advanced file management, PDF processing, rich note-taking, and analytics dashboard built with React/TypeScript and Express.
+A comprehensive CloudNexus with advanced file management, PDF processing, rich note-taking, and analytics dashboard built with React/TypeScript and Express.
 
 ## Features
 
