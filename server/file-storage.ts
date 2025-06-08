@@ -9,11 +9,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DATA_DIR = path.resolve(__dirname, '../data');
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const FILES_PATH = path.join(DATA_DIR, 'files.json');
 const NOTES_PATH = path.join(DATA_DIR, 'notes.json');
 
 function ensureDataFiles() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+  if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
   if (!fs.existsSync(FILES_PATH)) fs.writeFileSync(FILES_PATH, '[]');
   if (!fs.existsSync(NOTES_PATH)) fs.writeFileSync(NOTES_PATH, '[]');
 }
@@ -29,7 +31,14 @@ function writeJson<T>(file: string, data: T[]) {
 
 export class FileStorage implements IStorage {
   async getFiles(parentId?: number): Promise<File[]> {
-    const files = readJson<File>(FILES_PATH);
+    let files = readJson<File>(FILES_PATH);
+    // Remove files that do not exist in uploads dir
+    const existingFiles = files.filter(f => f.isFolder || (f.path && fs.existsSync(f.path)));
+    if (existingFiles.length !== files.length) {
+      // Remove missing files from files.json
+      writeJson(FILES_PATH, existingFiles);
+      files = existingFiles;
+    }
     return typeof parentId === 'number' ? files.filter(f => f.parentId === parentId) : files.filter(f => !('parentId' in f) || f.parentId == null);
   }
 
@@ -121,6 +130,34 @@ export class FileStorage implements IStorage {
     return notes.filter(n => n.title.toLowerCase().includes(query.toLowerCase()) || n.content.toLowerCase().includes(query.toLowerCase()));
   }
 
+  private getAvailableSpace(): { available: number; total: number; allocated: number } {
+    try {
+      // Read the stats for the uploads directory
+      const stats = fs.statfsSync(UPLOADS_DIR);
+      const available = stats.bavail * stats.bsize; // Available space in bytes
+      const total = stats.blocks * stats.bsize; // Total space in bytes
+      
+      // Allocate 80% of the available space for our app
+      // This ensures we leave some space for the system
+      const allocatedSpace = Math.floor(available * 0.8);
+      
+      return {
+        available,
+        total,
+        allocated: allocatedSpace
+      };
+    } catch (error) {
+      console.error('Error getting disk space:', error);
+      // Fallback to a reasonable default if we can't get disk space
+      const fallbackSize = 100 * 1024 * 1024 * 1024; // 100GB fallback
+      return {
+        available: fallbackSize,
+        total: fallbackSize,
+        allocated: fallbackSize * 0.8
+      };
+    }
+  }
+
   async getDashboardStats(): Promise<DashboardStats> {
     const files = readJson<File>(FILES_PATH);
     const notes = readJson<Note>(NOTES_PATH);
@@ -130,8 +167,11 @@ export class FileStorage implements IStorage {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const weeklyUploads = files.filter(f => new Date(f.uploadDate) >= weekAgo).length;
-    const storageLimit = 3 * 1024 * 1024 * 1024; // 3GB
-    const storagePercentage = Math.round((totalSize / storageLimit) * 100);
+    
+    // Get storage space info
+    const { allocated } = this.getAvailableSpace();
+    const storagePercentage = Math.round((totalSize / allocated) * 100);
+    
     return {
       totalFiles,
       totalNotes,
@@ -140,7 +180,7 @@ export class FileStorage implements IStorage {
       storageUsage: {
         percentage: storagePercentage,
         used: totalSize,
-        total: storageLimit,
+        total: allocated, // Use the allocated space instead of total disk space
       },
     };
   }

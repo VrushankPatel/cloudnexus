@@ -30,7 +30,6 @@ export function formatRelativeTime(date: Date | string): string {
 
 export function getFileIcon(mimeType: string): string {
   if (mimeType.startsWith('image/')) return '🖼️';
-  if (mimeType === 'application/pdf') return '📄';
   if (mimeType.startsWith('video/')) return '🎥';
   if (mimeType.startsWith('audio/')) return '🎵';
   if (mimeType.includes('document')) return '📝';
@@ -42,7 +41,6 @@ export function getFileIcon(mimeType: string): string {
 
 export function getFileTypeColor(mimeType: string): string {
   if (mimeType.startsWith('image/')) return 'bg-blue-500/20 text-blue-400';
-  if (mimeType === 'application/pdf') return 'bg-red-500/20 text-red-400';
   if (mimeType.startsWith('video/')) return 'bg-purple-500/20 text-purple-400';
   if (mimeType.startsWith('audio/')) return 'bg-green-500/20 text-green-400';
   if (mimeType.includes('document')) return 'bg-orange-500/20 text-orange-400';

@@ -1,11 +1,10 @@
 # CloudNexus
 
-A comprehensive CloudNexus with advanced file management, PDF processing, rich note-taking, and analytics dashboard built with React/TypeScript and Express.
+A comprehensive CloudNexus with advanced file management, rich note-taking, and analytics dashboard built with React/TypeScript and Express.
 
 ## Features
 
 - **File Management**: Upload, organize, and preview files with drag-drop support
-- **PDF Viewer**: Built-in PDF viewer with metadata extraction
 - **Notes System**: Rich note-taking with Google Keep-style interface
 - **Search**: Real-time search across files and notes
 - **Analytics Dashboard**: Storage statistics and file type analytics
@@ -142,12 +141,6 @@ personal-cloud-hub/
 - Auto-save functionality
 - Search note content
 
-### PDF Viewer
-- View PDFs directly in browser
-- Extract and display metadata
-- Navigate between pages
-- Zoom controls
-
 ### Search
 - Real-time search across files and notes
 - Dropdown results with quick navigation
@@ -266,6 +259,5 @@ For issues and questions:
 - Initial release
 - File management system
 - Notes functionality
-- PDF viewer
 - Search capabilities
 - Docker support

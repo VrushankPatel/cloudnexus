@@ -85,7 +85,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                           {searchResults.files.map((file: any) => (
                             <Link
                               key={file.id}
-                              href={file.mimeType === "application/pdf" ? `/pdf-viewer/${file.id}` : "/files"}
+                              href={"/files"}
                               className="flex items-center space-x-3 px-2 py-2 hover:bg-muted rounded-md"
                               onClick={() => {
                                 setShowSearchResults(false);

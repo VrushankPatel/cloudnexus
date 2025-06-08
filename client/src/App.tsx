@@ -10,7 +10,6 @@ import Header from "@/components/layout/header";
 import Dashboard from "@/pages/dashboard";
 import Files from "@/pages/files";
 import Notes from "@/pages/notes";
-import PDFViewer from "@/pages/pdf-viewer";
 import NotFound from "@/pages/not-found";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
@@ -48,11 +47,6 @@ function Router() {
       <Route path="/notes">
         <AppLayout>
           <Notes />
-        </AppLayout>
-      </Route>
-      <Route path="/pdf-viewer/:id?">
-        <AppLayout>
-          <PDFViewer />
         </AppLayout>
       </Route>
       <Route component={NotFound} />

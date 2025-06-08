@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { MoreVertical, Download, Star, Trash2 } from "lucide-react";
+import { MoreVertical, Download, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -44,7 +44,12 @@ export default function FileGrid({ files, viewMode, isLoading, onFolderClick }: 
     },
   });
 
-  const handleFileClick = (file: File) => {
+  const handleFileClick = (file: File, e: React.MouseEvent) => {
+    // If the click is from the dropdown menu or its children, don't handle file click
+    if ((e.target as HTMLElement).closest('.file-actions')) {
+      return;
+    }
+
     if (file.isFolder) {
       onFolderClick(file.id);
     } else {
@@ -55,7 +60,8 @@ export default function FileGrid({ files, viewMode, isLoading, onFolderClick }: 
     }
   };
 
-  const handleDelete = (fileId: number) => {
+  const handleDelete = (e: React.MouseEvent, fileId: number) => {
+    e.stopPropagation(); // Stop the click from reaching the file click handler
     deleteMutation.mutate(fileId);
   };
 
@@ -101,41 +107,44 @@ export default function FileGrid({ files, viewMode, isLoading, onFolderClick }: 
           <div
             key={file.id}
             className="flex items-center space-x-4 p-4 bg-slate-800 rounded-lg border border-slate-700 hover:border-slate-600 cursor-pointer transition-all"
-            onClick={() => handleFileClick(file)}
+            onClick={(e) => handleFileClick(file, e)}
           >
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getFileTypeColor(file.mimeType)}`}>
               <span className="text-lg">{getFileIcon(file.mimeType)}</span>
             </div>
             <div className="flex-1">
-              <h3 className="font-medium text-sm">{file.originalName}</h3>
+              <h3 className="font-medium text-sm">{file.originalName || file.name}</h3>
               <p className="text-xs text-slate-400">
                 {file.isFolder ? "Folder" : formatBytes(file.size)} • {formatRelativeTime(file.lastModified)}
               </p>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="sm">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem>
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Star className="w-4 h-4 mr-2" />
-                  Add to Favorites
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  className="text-red-400"
-                  onClick={() => handleDelete(file.id)}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="file-actions">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem onClick={(e) => {
+                    e.stopPropagation();
+                    if (file.path) {
+                      window.open(`/uploads/${file.name}`, '_blank');
+                    }
+                  }}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="text-red-400"
+                    onClick={(e) => handleDelete(e, file.id)}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         ))}
       </div>
@@ -148,9 +157,8 @@ export default function FileGrid({ files, viewMode, isLoading, onFolderClick }: 
         <div
           key={file.id}
           className="bg-slate-800 rounded-xl border border-slate-700 hover:border-slate-600 cursor-pointer transition-all hover:shadow-lg"
-          onClick={() => handleFileClick(file)}
+          onClick={(e) => handleFileClick(file, e)}
         >
-          {/* Image preview for image files */}
           {file.mimeType.startsWith('image/') && file.path && (
             <img
               src={`/uploads/thumbnail/${file.name}`}
@@ -158,7 +166,6 @@ export default function FileGrid({ files, viewMode, isLoading, onFolderClick }: 
               className="w-full h-32 object-cover rounded-t-xl"
               loading="lazy"
               onError={(e) => {
-                // Fallback to file icon if thumbnail fails
                 e.currentTarget.style.display = 'none';
               }}
             />
@@ -169,37 +176,40 @@ export default function FileGrid({ files, viewMode, isLoading, onFolderClick }: 
               <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${getFileTypeColor(file.mimeType)}`}>
                 <span className="text-lg">{getFileIcon(file.mimeType)}</span>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" size="sm">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem>
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Star className="w-4 h-4 mr-2" />
-                    Add to Favorites
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className="text-red-400"
-                    onClick={() => handleDelete(file.id)}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="file-actions">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation();
+                      if (file.path) {
+                        window.open(`/uploads/${file.name}`, '_blank');
+                      }
+                    }}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      className="text-red-400"
+                      onClick={(e) => handleDelete(e, file.id)}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
-            <h3 className="font-medium text-sm mb-1 truncate">{file.originalName}</h3>
+
+            <h3 className="font-medium text-sm mb-1 truncate" title={file.originalName || file.name}>
+              {file.originalName || file.name}
+            </h3>
             <p className="text-xs text-slate-400">
-              {file.isFolder ? "Folder" : formatBytes(file.size)}
-            </p>
-            <p className="text-xs text-slate-400">
-              Modified {formatRelativeTime(file.lastModified)}
+              {file.isFolder ? "Folder" : formatBytes(file.size)} • {formatRelativeTime(file.lastModified)}
             </p>
           </div>
         </div>

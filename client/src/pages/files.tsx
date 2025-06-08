@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,24 @@ export default function Files() {
       return response.json();
     },
   });
+
+  // WebSocket: Listen for file changes and update files/dashboard metrics
+  useEffect(() => {
+    const ws = new window.WebSocket(`ws://localhost:5050`);
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'filesChanged') {
+          queryClient.invalidateQueries({ queryKey: ["/api/files"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/recent-files"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/file-types"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/largest-files"] });
+        }
+      } catch {}
+    };
+    return () => ws.close();
+  }, [queryClient]);
 
   const createFolderMutation = useMutation({
     mutationFn: async (name: string) => {

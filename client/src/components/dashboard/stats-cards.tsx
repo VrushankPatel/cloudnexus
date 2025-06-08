@@ -1,8 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { FolderOpen, StickyNote, HardDrive, Upload } from "lucide-react";
+import type { DashboardStats } from "@shared/schema";
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
 
 export default function StatsCards() {
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
 
@@ -21,7 +30,7 @@ export default function StatsCards() {
     },
     {
       title: "Storage Used",
-      value: stats?.storageUsed || "0 B",
+      value: `${stats?.storageUsed || "0 B"} of ${stats?.storageUsage?.total ? formatBytes(stats.storageUsage.total) : "0 B"}`,
       icon: HardDrive,
       color: "bg-amber-500/20 text-amber-400",
     },

@@ -29,6 +29,27 @@ const noteColors = [
   { name: "Purple", value: "purple", color: "bg-purple-500" },
 ];
 
+const MAX_TAGS = 8;
+
+function normalizeTag(raw: string): string {
+  let tag = raw.trim();
+  if (!tag) return "";
+  // Remove leading # for normalization
+  tag = tag.replace(/^#+/, "");
+  // If tag contains spaces, camelCase it
+  if (tag.includes(" ")) {
+    tag = tag
+      .split(/\s+/)
+      .map((word, i) =>
+        i === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      )
+      .join("");
+  } else {
+    tag = tag.toLowerCase();
+  }
+  return `#${tag}`;
+}
+
 export default function NoteEditor({ open, onOpenChange, note, onSave, isLoading }: NoteEditorProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -67,10 +88,28 @@ export default function NoteEditor({ open, onOpenChange, note, onSave, isLoading
   };
 
   const handleAddTag = () => {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags([...tags, newTag.trim()]);
-      setNewTag("");
+    if (!newTag.trim() || tags.length >= MAX_TAGS) return;
+    let input = newTag.trim();
+    let newTags: string[] = [];
+    // If input contains multiple #, split by #
+    if (input.includes("#")) {
+      newTags = input
+        .split("#")
+        .map(t => t.trim())
+        .filter(Boolean)
+        .map(normalizeTag);
+    } else if (input.includes(" ")) {
+      // If input is multiple words, treat as one camelCase tag
+      newTags = [normalizeTag(input)];
+    } else {
+      newTags = [normalizeTag(input)];
     }
+    // Remove duplicates and already existing tags
+    newTags = newTags.filter(t => t && !tags.includes(t));
+    // Limit to max tags
+    const allowed = Math.max(0, MAX_TAGS - tags.length);
+    setTags([...tags, ...newTags.slice(0, allowed)]);
+    setNewTag("");
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
@@ -160,12 +199,14 @@ export default function NoteEditor({ open, onOpenChange, note, onSave, isLoading
                     }
                   }}
                   className="flex-1"
+                  maxLength={32}
+                  disabled={tags.length >= MAX_TAGS}
                 />
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleAddTag}
-                  disabled={!newTag.trim() || tags.includes(newTag.trim())}
+                  disabled={!newTag.trim() || tags.length >= MAX_TAGS}
                 >
                   <Hash className="w-4 h-4" />
                 </Button>
@@ -182,6 +223,9 @@ export default function NoteEditor({ open, onOpenChange, note, onSave, isLoading
                     <X className="w-3 h-3 ml-1" />
                   </Badge>
                 ))}
+                {tags.length >= MAX_TAGS && (
+                  <span className="text-xs text-amber-400 ml-2">Max {MAX_TAGS} tags</span>
+                )}
               </div>
             </div>
           </div>

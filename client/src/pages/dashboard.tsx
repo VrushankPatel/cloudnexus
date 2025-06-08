@@ -1,10 +1,23 @@
 import StatsCards from "@/components/dashboard/stats-cards";
 import RecentFiles from "@/components/dashboard/recent-files";
 import FileTypesChart from "@/components/dashboard/file-types-chart";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatBytes, formatRelativeTime } from "@/lib/utils";
+import { useEffect } from "react";
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/recent-files"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/file-types"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/largest-files"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/files"] });
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [queryClient]);
+
   const { data: largestFiles, isLoading: loadingLargest } = useQuery({
     queryKey: ["/api/dashboard/largest-files"],
   });
@@ -44,7 +57,7 @@ export default function Dashboard() {
                     Loading largest files...
                   </td>
                 </tr>
-              ) : largestFiles && largestFiles.length > 0 ? (
+              ) : Array.isArray(largestFiles) && largestFiles.length > 0 ? (
                 largestFiles.map((file: any) => (
                   <tr key={file.id} className="border-b border-slate-700/50">
                     <td className="py-3">
@@ -52,7 +65,6 @@ export default function Dashboard() {
                         <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
                           <span className="text-purple-400 text-xs">
                             {file.mimeType.startsWith('video/') ? '🎥' : 
-                             file.mimeType === 'application/pdf' ? '📄' :
                              file.mimeType.startsWith('image/') ? '🖼️' : '📄'}
                           </span>
                         </div>

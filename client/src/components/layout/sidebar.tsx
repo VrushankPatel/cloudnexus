@@ -10,13 +10,21 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import type { DashboardStats } from "@shared/schema";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Files", href: "/files", icon: FolderOpen },
   { name: "Notes", href: "/notes", icon: StickyNote },
-  { name: "PDF Viewer", href: "/pdf-viewer", icon: FileText },
 ];
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -26,7 +34,7 @@ interface SidebarProps {
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const [location] = useLocation();
 
-  const { data: stats } = useQuery({
+  const { data: stats } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
 
@@ -106,7 +114,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 />
               </div>
               <div className="mt-1 text-xs">
-                {stats?.storageUsed || "0 B"} of 3 GB used
+                {stats?.storageUsed || "0 B"} of {stats?.storageUsage?.total ? formatBytes(stats.storageUsage.total) : "0 B"} used
               </div>
             </div>
           </div>

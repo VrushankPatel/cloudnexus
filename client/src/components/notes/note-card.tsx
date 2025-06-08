@@ -1,4 +1,4 @@
-import { MoreVertical, Star, Edit, Trash2 } from "lucide-react";
+import { MoreVertical, Edit, Trash2, Pin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatRelativeTime, getNoteColorClass, truncateText } from "@/lib/utils";
 import type { Note } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
 
 interface NoteCardProps {
   note: Note;
@@ -21,41 +22,45 @@ export default function NoteCard({ note, onEdit, onDelete, onTogglePin }: NoteCa
 
   return (
     <div
-      className={`note-card bg-slate-800 rounded-xl border cursor-pointer transition-all p-4 hover:border-slate-600 ${colorClass}`}
+      className={`note-card bg-card rounded-xl border cursor-pointer p-4 hover:border-border/60 ${colorClass} min-h-[200px] max-h-[400px] flex flex-col`}
       onClick={() => onEdit(note)}
     >
-      <div className="flex items-start justify-between mb-3">
-        <h3 className="font-medium text-sm line-clamp-2">{note.title}</h3>
-        <div className="flex items-center space-x-1">
+      <div className="flex items-start justify-between mb-3 gap-3">
+        <h3 className="font-medium text-sm text-foreground/90 line-clamp-2 flex-1">{note.title}</h3>
+        <div className="flex items-center space-x-1 flex-shrink-0">
           <Button
             variant="ghost"
             size="sm"
-            className={`p-1 ${note.isPinned ? "text-amber-400" : "text-slate-400 hover:text-amber-400"}`}
+            className={`p-1 ${note.isPinned ? "text-amber-400" : "text-muted-foreground hover:text-amber-400"}`}
             onClick={(e) => {
               e.stopPropagation();
               onTogglePin(note);
             }}
+            aria-label={note.isPinned ? "Unpin note" : "Pin note"}
           >
-            <Star className={`w-4 h-4 ${note.isPinned ? "fill-current" : ""}`} />
+            <Pin className={`w-4 h-4 ${note.isPinned ? "fill-current" : ""}`} />
           </Button>
+          
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" size="sm" className="p-1 text-slate-400 hover:text-white">
+              <Button variant="ghost" size="sm" className="p-1 text-muted-foreground hover:text-foreground">
                 <MoreVertical className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => onEdit(note)}>
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation();
+                onEdit(note);
+              }}>
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onTogglePin(note)}>
-                <Star className="w-4 h-4 mr-2" />
-                {note.isPinned ? "Unpin" : "Pin"}
-              </DropdownMenuItem>
               <DropdownMenuItem 
-                className="text-red-400"
-                onClick={() => onDelete(note.id)}
+                className="text-destructive focus:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(note.id);
+                }}
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
@@ -65,27 +70,28 @@ export default function NoteCard({ note, onEdit, onDelete, onTogglePin }: NoteCa
         </div>
       </div>
       
-      <div className="text-sm text-slate-300 mb-3">
-        <div 
-          className="prose prose-sm prose-invert max-w-none"
-          dangerouslySetInnerHTML={{ 
-            __html: truncateText(note.content, 200) 
-          }} 
-        />
+      <div className="flex-1 overflow-hidden">
+        <p className="text-sm text-muted-foreground/80 break-words whitespace-pre-wrap line-clamp-[12]">
+          {note.content}
+        </p>
       </div>
       
-      <div className="flex items-center justify-between text-xs text-slate-400">
-        <span>{formatRelativeTime(note.updatedAt)}</span>
-        <div className="flex items-center space-x-2">
+      {note.tags && note.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2 mb-1">
           {note.tags.map((tag) => (
-            <span
+            <Badge
               key={tag}
-              className="px-2 py-1 bg-primary/20 text-primary rounded-full"
+              className="bg-amber-400 text-amber-900 font-semibold px-2 py-0.5 rounded-full text-[11px] border-none shadow-sm"
+              style={{ letterSpacing: '0.01em' }}
             >
               {tag}
-            </span>
+            </Badge>
           ))}
         </div>
+      )}
+      
+      <div className="mt-auto pt-3 text-xs text-muted-foreground border-t border-border/40">
+        {formatRelativeTime(new Date(note.updatedAt))}
       </div>
     </div>
   );
