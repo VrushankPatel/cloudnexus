@@ -32,13 +32,22 @@ function writeJson<T>(file: string, data: T[]) {
 export class FileStorage implements IStorage {
   async getFiles(parentId?: number): Promise<File[]> {
     let files = readJson<File>(FILES_PATH);
-    // Remove files that do not exist in uploads dir
-    const existingFiles = files.filter(f => f.isFolder || (f.path && fs.existsSync(f.path)));
+    // Keep all folders and files that exist
+    const existingFiles = files.filter(f => {
+      if (f.isFolder) {
+        // For folders, check if they have any children
+        return files.some(child => child.parentId === f.id);
+      }
+      // For files, check if they exist on disk
+      return f.path && fs.existsSync(f.path);
+    });
+    
+    // If we found missing files/folders, update files.json
     if (existingFiles.length !== files.length) {
-      // Remove missing files from files.json
       writeJson(FILES_PATH, existingFiles);
       files = existingFiles;
     }
+    
     return typeof parentId === 'number' ? files.filter(f => f.parentId === parentId) : files.filter(f => !('parentId' in f) || f.parentId == null);
   }
 

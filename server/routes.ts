@@ -7,6 +7,7 @@ import path from "path";
 import fs from "fs";
 import type { Request, Response, NextFunction } from "express";
 import { files as fileSchema, type File } from '@shared/schema';
+import type { File as FileType } from '@shared/schema';
 
 // Configure multer for file uploads
 const uploadDir = path.join(process.cwd(), "data", "uploads");
@@ -16,7 +17,18 @@ if (!fs.existsSync(uploadDir)) {
 
 const upload = multer({
   storage: multer.diskStorage({
-    destination: uploadDir,
+    destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+      let dest = uploadDir;
+      // If parentId is present, store in subdirectory
+      const parentId = req.body.parentId ? String(req.body.parentId) : null;
+      if (parentId) {
+        dest = path.join(uploadDir, parentId);
+        if (!fs.existsSync(dest)) {
+          fs.mkdirSync(dest, { recursive: true });
+        }
+      }
+      cb(null, dest);
+    },
     filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       cb(null, uniqueSuffix + path.extname(file.originalname));
@@ -40,10 +52,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         files = JSON.parse(fs.readFileSync(FILES_PATH, 'utf-8'));
       } catch {}
-      const existingFiles = files.filter(f => f.isFolder || (f.path && fs.existsSync(f.path)));
-      if (existingFiles.length !== files.length) {
-        fs.writeFileSync(FILES_PATH, JSON.stringify(existingFiles, null, 2));
-        console.log(`[CLEANUP] Removed ${files.length - existingFiles.length} missing files from files.json`);
+      let changed = false;
+      for (let i = files.length - 1; i >= 0; i--) {
+        const f = files[i];
+        if (f.isFolder) {
+          // For folders, we don't check physical existence since they're virtual
+          // Only check if they have any children that exist
+          const hasChildren = files.some(child => child.parentId === f.id);
+          if (!hasChildren) {
+            // If folder has no children, it can be removed
+            files.splice(i, 1);
+            changed = true;
+          }
+        } else if (f.path && !fs.existsSync(f.path)) {
+          // Remove missing file
+          files.splice(i, 1);
+          changed = true;
+        }
+      }
+      if (changed) {
+        fs.writeFileSync(FILES_PATH, JSON.stringify(files, null, 2));
+        console.log(`[CLEANUP] Recursively removed missing folders/files from files.json`);
       }
     }, 10 * 1000);
   }
@@ -181,9 +210,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "File not found" });
       }
 
-      // Delete physical file if it exists
-      if (file.path && fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
+      // If it's a folder, recursively delete all contents
+      if (file.isFolder) {
+        const files = await storage.getFiles();
+        // Recursively remove all children from files.json and disk
+        recursiveRemoveFolderAndContents(id, files, uploadDir);
+        // Remove the folder's directory if it exists
+        const folderPath = path.join(uploadDir, String(id));
+        if (fs.existsSync(folderPath)) {
+          fs.rmSync(folderPath, { recursive: true, force: true });
+        }
+        // Write updated files.json
+        const FILES_PATH = path.join(process.cwd(), 'data', 'files.json');
+        fs.writeFileSync(FILES_PATH, JSON.stringify(files, null, 2));
+      } else {
+        // Delete physical file if it exists
+        if (file.path && fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
       }
 
       const deleted = await storage.deleteFile(id);
@@ -329,15 +373,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/uploads/:filename", async (req, res) => {
     const filename = req.params.filename;
-    const filePath = path.join(uploadDir, filename);
+    let filePath = path.join(uploadDir, filename);
     if (!fs.existsSync(filePath)) {
-      // Remove from files.json if present
-      const files = await storage.getFiles();
-      const fileEntry = files.find(f => f.name === filename);
-      if (fileEntry) {
-        await storage.deleteFile(fileEntry.id);
+      // Search all subdirectories for the file
+      const subdirs = fs.readdirSync(uploadDir, { withFileTypes: true })
+        .filter(dirent => dirent.isDirectory())
+        .map(dirent => dirent.name);
+      let found = false;
+      for (const subdir of subdirs) {
+        const candidate = path.join(uploadDir, subdir, filename);
+        if (fs.existsSync(candidate)) {
+          filePath = candidate;
+          found = true;
+          break;
+        }
       }
-      return res.status(404).json({ error: "File not found (removed from list)" });
+      if (!found) {
+        // Remove from files.json if present
+        const files = await storage.getFiles();
+        const fileEntry = files.find(f => f.name === filename);
+        if (fileEntry) {
+          await storage.deleteFile(fileEntry.id);
+        }
+        return res.status(404).json({ error: "File not found (removed from list)" });
+      }
     }
     res.sendFile(filePath);
   });
@@ -345,12 +404,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Thumbnail endpoint for lightweight image previews
   app.get("/uploads/thumbnail/:filename", (req, res) => {
     const filename = req.params.filename;
-    const filePath = path.join(uploadDir, filename);
-    
+    let filePath = path.join(uploadDir, filename);
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "File not found" });
+      // Search all subdirectories for the file
+      const subdirs = fs.readdirSync(uploadDir, { withFileTypes: true })
+        .filter(dirent => dirent.isDirectory())
+        .map(dirent => dirent.name);
+      let found = false;
+      for (const subdir of subdirs) {
+        const candidate = path.join(uploadDir, subdir, filename);
+        if (fs.existsSync(candidate)) {
+          filePath = candidate;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        return res.status(404).json({ error: "File not found" });
+      }
     }
-
     // For now, serve a placeholder or the original with cache headers for thumbnails
     // In production, you would generate actual thumbnails using sharp or similar
     res.setHeader('Cache-Control', 'public, max-age=31536000');
@@ -362,15 +434,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
-// Utility to remove missing files from files.json
+// Recursive cleanup for missing folders
+function recursiveRemoveFolderAndContents(folderId: number, files: FileType[], uploadsDir: string): void {
+  // Find all children (files and subfolders)
+  const children = files.filter((f: FileType) => f.parentId === folderId);
+  for (const child of children) {
+    if (child.isFolder) {
+      // Recursively remove subfolder
+      recursiveRemoveFolderAndContents(child.id, files, uploadsDir);
+      // Remove subfolder directory if exists
+      const subfolderPath = path.join(uploadsDir, String(child.id));
+      if (fs.existsSync(subfolderPath)) {
+        fs.rmSync(subfolderPath, { recursive: true, force: true });
+      }
+    } else {
+      // Remove file from disk
+      if (child.path && fs.existsSync(child.path)) {
+        fs.unlinkSync(child.path);
+      }
+    }
+    // Remove from files array
+    const idx = files.findIndex((f: FileType) => f.id === child.id);
+    if (idx !== -1) files.splice(idx, 1);
+  }
+}
+
+// Utility to remove missing files/folders from files.json recursively
 async function removeMissingFilesFromJson() {
-  const files = await storage.getFiles();
+  // Ensure FILES_PATH and uploadDir are accessible
+  const DATA_DIR = path.join(process.cwd(), 'data');
+  const FILES_PATH = path.join(DATA_DIR, 'files.json');
+  const uploadDir = path.join(process.cwd(), 'data', 'uploads');
+  let files: FileType[] = [];
+  try {
+    files = JSON.parse(fs.readFileSync(FILES_PATH, 'utf-8'));
+  } catch {}
   let changed = false;
-  for (const file of files) {
-    if (!file.isFolder && file.path && !fs.existsSync(file.path)) {
-      await storage.deleteFile(file.id);
+  for (let i = files.length - 1; i >= 0; i--) {
+    const f = files[i];
+    if (f.isFolder) {
+      const folderPath = path.join(uploadDir, String(f.id));
+      if (!fs.existsSync(folderPath)) {
+        recursiveRemoveFolderAndContents(f.id, files, uploadDir);
+        files.splice(i, 1);
+        changed = true;
+      }
+    } else if (f.path && !fs.existsSync(f.path)) {
+      files.splice(i, 1);
       changed = true;
     }
+  }
+  if (changed) {
+    fs.writeFileSync(FILES_PATH, JSON.stringify(files, null, 2));
+    console.log(`[CLEANUP] Recursively removed missing folders/files from files.json`);
   }
   return changed;
 }
